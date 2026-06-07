@@ -17,13 +17,16 @@ func parseDateFromFilename(_ filename: String) -> ParsedFilename? {
     let possibleDate = String(components[0])
     let rest = components.count > 1 ? String(components[1]) : ""
 
-    // Try to parse date: YYYY.MM.DD
-    let datePattern = #"^\d{4}\.\d{2}\.\d{2}$"#
-    guard possibleDate.range(of: datePattern, options: .regularExpression) != nil else {
+    // Try to parse date: YYYY.MM.DD or YYYY-MM-DD
+    let datePattern = #"^(\d{4})([.-])(\d{2})\2(\d{2})$"#
+    guard let match = possibleDate.range(of: datePattern, options: .regularExpression) else {
         return nil
     }
 
-    let parts = possibleDate.split(separator: ".")
+    let dateStr = String(possibleDate[match])
+    let separatorChar = dateStr.contains("-") ? Character("-") : Character(".")
+    let parts = dateStr.split(separator: separatorChar)
+
     guard parts.count == 3,
           let year = Int(parts[0]),
           let month = Int(parts[1]),
@@ -40,19 +43,25 @@ func parseDateFromFilename(_ filename: String) -> ParsedFilename? {
     dateComponents.second = 0
 
     var hasExplicitTime = false
+    var cleanedRest = rest
 
-    // Check if there's a time in rest: HH-mm format
+    // Check if there's a time at start of rest: HH-mm format followed by space
     if rest.count > 0 {
-        let timePattern = #"^(\d{2})-(\d{2})"#
-        if let match = rest.range(of: timePattern, options: .regularExpression) {
-            let timeStr = String(rest[match])
+        let timePattern = #"^(\d{2})-(\d{2})\s"#
+        if let timeMatch = rest.range(of: timePattern, options: .regularExpression) {
+            // Extract the time part (before the space)
+            let timeStr = String(rest[rest.startIndex..<timeMatch.lowerBound])
             let timeParts = timeStr.split(separator: "-")
             if timeParts.count == 2,
                let hour = Int(timeParts[0]),
-               let minute = Int(timeParts[1]) {
+               let minute = Int(timeParts[1]),
+               hour >= 0 && hour <= 23,
+               minute >= 0 && minute <= 59 {
                 dateComponents.hour = hour
                 dateComponents.minute = minute
                 hasExplicitTime = true
+                // Remove time and space from the filename
+                cleanedRest = String(rest[timeMatch.upperBound...])
             }
         }
     }
@@ -62,7 +71,7 @@ func parseDateFromFilename(_ filename: String) -> ParsedFilename? {
         return nil
     }
 
-    let newName = rest.trimmingCharacters(in: .whitespaces)
+    let newName = cleanedRest.trimmingCharacters(in: .whitespaces)
     guard !newName.isEmpty else {
         return nil
     }
@@ -71,6 +80,33 @@ func parseDateFromFilename(_ filename: String) -> ParsedFilename? {
         dateTime: DateTimeInfo(date: date, hasExplicitTime: hasExplicitTime),
         newName: newName
     )
+}
+
+func findAvailablePath(_ filePath: String) -> String {
+    let fileManager = FileManager.default
+
+    guard fileManager.fileExists(atPath: filePath) else {
+        return filePath
+    }
+
+    let url = URL(fileURLWithPath: filePath)
+    let dirPath = url.deletingLastPathComponent().path
+    let filename = url.lastPathComponent
+    let fileExtension = url.pathExtension
+    let baseName = fileExtension.isEmpty ? filename : String(filename.dropLast(fileExtension.count + 1))
+
+    var counter = 2
+    while true {
+        let newFilename = fileExtension.isEmpty ?
+            "\(baseName) \(counter)" :
+            "\(baseName) \(counter).\(fileExtension)"
+        let newPath = (dirPath as NSString).appendingPathComponent(newFilename)
+
+        if !fileManager.fileExists(atPath: newPath) {
+            return newPath
+        }
+        counter += 1
+    }
 }
 
 func processFile(_ filePath: String) -> Bool {
@@ -93,7 +129,12 @@ func processFile(_ filePath: String) -> Bool {
     }
 
     let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
-    let newPath = (directory as NSString).appendingPathComponent(parsed.newName)
+    var newPath = (directory as NSString).appendingPathComponent(parsed.newName)
+
+    // Handle duplicates
+    if fileManager.fileExists(atPath: newPath) && newPath != filePath {
+        newPath = findAvailablePath(newPath)
+    }
 
     do {
         // Rename file
@@ -106,7 +147,7 @@ func processFile(_ filePath: String) -> Bool {
         ]
         try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
 
-        print("✓ \(filename) → \(parsed.newName)")
+        print("✓ \(filename) → \(URL(fileURLWithPath: newPath).lastPathComponent)")
         return true
     } catch {
         print("✗ \(filename): \(error.localizedDescription)")
@@ -119,7 +160,6 @@ func processDirectory(_ dirPath: String, recursive: Bool) {
 
     do {
         let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
-        var processed = 0
 
         for item in contents {
             let fullPath = (dirPath as NSString).appendingPathComponent(item)
@@ -134,9 +174,7 @@ func processDirectory(_ dirPath: String, recursive: Bool) {
                     processDirectory(fullPath, recursive: true)
                 }
             } else {
-                if processFile(fullPath) {
-                    processed += 1
-                }
+                _ = processFile(fullPath)
             }
         }
     } catch {
@@ -155,6 +193,7 @@ struct realdate {
             print("  -r    Recursive (process subdirectories)")
             print("Examples:")
             print("  realdate \"2026.06.07 file.pdf\"")
+            print("  realdate \"2026-06-07 file.pdf\"")
             print("  realdate *.pdf")
             print("  realdate -r *")
             return
