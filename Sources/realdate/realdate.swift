@@ -1,85 +1,73 @@
+//
+//  RealDate.swift
+//  RealDate
+//
+//  Created by Anton Fillmann on 07.06.2026.
+//
+
 import Foundation
+import ArgumentParser
 
-struct DateTimeInfo {
+struct DateFilenameTuple {
     let date: Date
-    let hasExplicitTime: Bool
+    let name: String
 }
 
-struct ParsedFilename {
-    let dateTime: DateTimeInfo
-    let newName: String
+extension DateFormatter {
+    
+    static var yyyymmdd: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }
+    
+    static var yyyyMMdd_HHmm: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd.HH.mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }
+    
+    func date(fromFilename filename: String) -> Date? {
+        let dateLength = self.dateFormat.count
+        let separators = CharacterSet(charactersIn: "-_: ")
+        let dateString = String(filename.prefix(dateLength))
+            .components(separatedBy: separators)
+            .joined(separator: ".")
+        return self.date(from: dateString)
+    }
 }
 
-func parseDateFromFilename(_ filename: String) -> ParsedFilename? {
-    let components = filename.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
-    guard components.count >= 1 else { return nil }
-
-    let possibleDate = String(components[0])
-    let rest = components.count > 1 ? String(components[1]) : ""
-
-    // Try to parse date: YYYY.MM.DD or YYYY-MM-DD
-    let datePattern = #"^(\d{4})([.-])(\d{2})\2(\d{2})$"#
-    guard let match = possibleDate.range(of: datePattern, options: .regularExpression) else {
-        return nil
+func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
+    if condition {
+        print(message())
     }
+}
 
-    let dateStr = String(possibleDate[match])
-    let separatorChar = dateStr.contains("-") ? Character("-") : Character(".")
-    let parts = dateStr.split(separator: separatorChar)
-
-    guard parts.count == 3,
-          let year = Int(parts[0]),
-          let month = Int(parts[1]),
-          let day = Int(parts[2]) else {
-        return nil
-    }
-
-    var dateComponents = DateComponents()
-    dateComponents.year = year
-    dateComponents.month = month
-    dateComponents.day = day
-    dateComponents.hour = 10
-    dateComponents.minute = 0
-    dateComponents.second = 0
-
-    var hasExplicitTime = false
-    var cleanedRest = rest
-
-    // Check if there's a time at start of rest: HH-mm format followed by space
-    if rest.count > 0 {
-        let timePattern = #"^(\d{2})-(\d{2})\s"#
-        if let timeMatch = rest.range(of: timePattern, options: .regularExpression) {
-            // Extract the time part (before the space)
-            let timeStr = String(rest[rest.startIndex..<timeMatch.lowerBound])
-            let timeParts = timeStr.split(separator: "-")
-            if timeParts.count == 2,
-               let hour = Int(timeParts[0]),
-               let minute = Int(timeParts[1]),
-               hour >= 0 && hour <= 23,
-               minute >= 0 && minute <= 59 {
-                dateComponents.hour = hour
-                dateComponents.minute = minute
-                hasExplicitTime = true
-                // Remove time and space from the filename
-                cleanedRest = String(rest[timeMatch.upperBound...])
-            }
+func parseDateFromFilename(_ filename: String) -> DateFilenameTuple? {
+    let formatters = [
+        DateFormatter.yyyyMMdd_HHmm,
+        DateFormatter.yyyymmdd
+    ]
+    for formatter in formatters {
+        guard let date = formatter.date(fromFilename: filename) else {
+            continue // next formatter.
         }
+        let trimmingChars = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-_."))
+        let realFilename = filename
+            .dropFirst(formatter.dateFormat.count) // cut away date string.
+            .drop(while: { char in
+                char.unicodeScalars.allSatisfy { trimmingChars.contains($0) } // trims left all chars from trimmingChars set.
+            })
+        
+        guard realFilename.count > 0 else {
+            return nil // if no name left, to much trimmed away. Cancels for this filename.
+        }
+        
+        return DateFilenameTuple(date: date, name: String(realFilename))
     }
-
-    let calendar = Calendar.current
-    guard let date = calendar.date(from: dateComponents) else {
-        return nil
-    }
-
-    let newName = cleanedRest.trimmingCharacters(in: .whitespaces)
-    guard !newName.isEmpty else {
-        return nil
-    }
-
-    return ParsedFilename(
-        dateTime: DateTimeInfo(date: date, hasExplicitTime: hasExplicitTime),
-        newName: newName
-    )
+    return nil
 }
 
 func findAvailablePath(_ filePath: String) -> String {
@@ -124,12 +112,12 @@ func processFile(_ filePath: String) -> Bool {
 
     let filename = URL(fileURLWithPath: filePath).lastPathComponent
 
-    guard let parsed = parseDateFromFilename(filename) else {
+    guard let tuple = parseDateFromFilename(filename) else {
         return false
     }
 
     let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
-    var newPath = (directory as NSString).appendingPathComponent(parsed.newName)
+    var newPath = (directory as NSString).appendingPathComponent(tuple.name)
 
     // Handle duplicates
     if fileManager.fileExists(atPath: newPath) && newPath != filePath {
@@ -142,14 +130,15 @@ func processFile(_ filePath: String) -> Bool {
 
         // Set timestamps
         let attributes: [FileAttributeKey: Any] = [
-            .creationDate: parsed.dateTime.date,
-            .modificationDate: parsed.dateTime.date
+            .creationDate: tuple.date,
+            .modificationDate: tuple.date
         ]
         try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
 
         print("✓ \(filename) → \(URL(fileURLWithPath: newPath).lastPathComponent)")
         return true
-    } catch {
+    }
+    catch {
         print("✗ \(filename): \(error.localizedDescription)")
         return false
     }
@@ -183,52 +172,49 @@ func processDirectory(_ dirPath: String, recursive: Bool) {
 }
 
 @main
-struct realdate {
-    static func main() {
-        let arguments = CommandLine.arguments.dropFirst()
+struct RealDate: ParsableCommand {
+    static let appname = "realdate"
+    static let abstract = "Sucht nach dem vorangehenden Datum im Dateinamen, entfernt diesen aus dem Dateinamen und weist ihn als created- & modified-Datum dieser Datei zu."
+    static let version = "0.1.0"
+    
+    static let configuration = CommandConfiguration(
+        commandName: Self.appname,
+        abstract: Self.abstract,
+        version: Self.version
+    )
+    
+    @Option(name: .shortAndLong, help: "Das Datumsformat (z.B. YYYY-MM-DD).")
+    var format: String = "YYYY.MM.DD"
+    
+    @Flag(name: .shortAndLong, help: "Suche rekursiv in Unterordnern.")
+    var recursive = false
+    
+    @Flag(name: .shortAndLong, help: "Zeige detaillierte Informationen an.")
+    var verbose = false
+    
+    @Argument(help: "Der Pfad zur Datei(en) oder zum Verzeichnis.")
+    var path: String
+    
+    mutating func run() throws {
+        let fileManager = FileManager.default
+        var isDir: ObjCBool = false
 
-        guard !arguments.isEmpty else {
-            print("Usage: realdate [OPTIONS] [PATH...]")
-            print("Options:")
-            print("  -r    Recursive (process subdirectories)")
-            print("Examples:")
-            print("  realdate \"2026.06.07 file.pdf\"")
-            print("  realdate \"2026-06-07 file.pdf\"")
-            print("  realdate *.pdf")
-            print("  realdate -r *")
+        guard fileManager.fileExists(atPath: self.path, isDirectory: &isDir) else {
+            print("\(self.path) not found. Stop here!")
             return
         }
 
-        var recursive = false
-        var paths: [String] = []
-
-        for arg in arguments {
-            if arg == "-r" {
-                recursive = true
-            } else {
-                paths.append(arg)
-            }
+        if isDir.boolValue {
+            processDirectory(self.path, recursive: recursive)
+        } else {
+            _ = processFile(self.path)
         }
-
-        guard !paths.isEmpty else {
-            print("No paths specified")
-            return
-        }
-
-        for path in paths {
-            let fileManager = FileManager.default
-            var isDir: ObjCBool = false
-
-            guard fileManager.fileExists(atPath: path, isDirectory: &isDir) else {
-                print("✗ Path not found: \(path)")
-                continue
-            }
-
-            if isDir.boolValue {
-                processDirectory(path, recursive: recursive)
-            } else {
-                _ = processFile(path)
-            }
-        }
+        
+//        guard let date = formatter.date(from: dateString) else {
+//            printIf(self.verbose, "\(filename) \thas no prefix date, will be ignored.")
+//            exit(0)
+//        }
+//        
+//        printIf(self.verbose, "\(filename) \tfound date: \(date)")
     }
 }
