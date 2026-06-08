@@ -62,15 +62,19 @@ struct FileOperationsTests {
 
     @Test("Handle duplicate filenames")
     func handleDuplicateFilenames() throws {
-        let testPath1 = tempDir.appendingPathComponent("2026.06.07 Document.txt").path
+        // Create two files with different dates but same target name
+        let testPath1 = tempDir.appendingPathComponent("2026.06.06 Document.txt").path
         let testPath2 = tempDir.appendingPathComponent("2026.06.07 Document.txt").path
+        let testPath3 = tempDir.appendingPathComponent("2026.06.08 Document.txt").path
 
         try "Content 1".write(toFile: testPath1, atomically: true, encoding: .utf8)
         try "Content 2".write(toFile: testPath2, atomically: true, encoding: .utf8)
+        try "Content 3".write(toFile: testPath3, atomically: true, encoding: .utf8)
 
         defer {
             try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("Document.txt").path)
             try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("Document 2.txt").path)
+            try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("Document 3.txt").path)
         }
 
         let result1 = processFile(testPath1)
@@ -78,11 +82,16 @@ struct FileOperationsTests {
 
         let result2 = processFile(testPath2)
         #expect(result2 == true)
+        
+        let result3 = processFile(testPath3)
+        #expect(result3 == true)
 
         let newPath1 = tempDir.appendingPathComponent("Document.txt").path
         let newPath2 = tempDir.appendingPathComponent("Document 2.txt").path
+        let newPath3 = tempDir.appendingPathComponent("Document 3.txt").path
         #expect(FileManager.default.fileExists(atPath: newPath1))
         #expect(FileManager.default.fileExists(atPath: newPath2))
+        #expect(FileManager.default.fileExists(atPath: newPath3))
     }
 
     @Test("Time removed from filename")
