@@ -53,6 +53,14 @@ extension DateFormatter {
     }
 }
 
+extension Date {
+    static let currentCalendar = Calendar.current
+    
+    func isSameDay(as otherDate: Date) -> Bool {
+        Self.currentCalendar.isDate(self, inSameDayAs: otherDate)
+    }
+}
+
 func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
     if condition {
         print(message())
@@ -130,42 +138,45 @@ func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = fal
     }
 
     do {
-        if noRename {
-            // Only set timestamps, keep filename as-is
+        // Read the current creation-date
+        let attributes = try fileManager.attributesOfItem(atPath: filePath)
+        guard let creationDate = attributes[.creationDate] as? Date else {
+            throw Foundation.POSIXError(.ENOATTR)
+        }
+        
+        // Compare the creation-date with date from filename.
+        //   Are the dates (w/o times) equal, no need to reset the date to the same value.
+        if tuple.date.isSameDay(as: creationDate) == false {
             let attributes: [FileAttributeKey: Any] = [
                 .creationDate: tuple.date,
                 .modificationDate: tuple.date
             ]
             try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
-
-            let dateFormatter = DateFormatter.mediumDateShortTime
-            printIf(verbose, "realdate: \(filename): Date set to \(dateFormatter.string(from: tuple.date)) (filename unchanged)")
-        } else {
-            // Rename file and set timestamps
-            let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
-            var newPath = (directory as NSString).appendingPathComponent(tuple.name)
-
-            // Handle duplicates
-            if fileManager.fileExists(atPath: newPath) && newPath != filePath {
-                newPath = findAvailablePath(newPath)
-                let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-                printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
-            }
-
-            // Rename file
-            try fileManager.moveItem(atPath: filePath, toPath: newPath)
-
-            // Set timestamps
-            let attributes: [FileAttributeKey: Any] = [
-                .creationDate: tuple.date,
-                .modificationDate: tuple.date
-            ]
-            try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
-
-            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-            let dateFormatter = DateFormatter.mediumDateShortTime
-            printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateFormatter.string(from: tuple.date))")
         }
+        
+        let dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
+        
+        if noRename {
+            printIf(verbose, "realdate: \(filename): Date set to \(dateString) (filename unchanged)")
+            return
+        }
+        
+        // Rename file and set timestamps
+        let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
+        var newPath = (directory as NSString).appendingPathComponent(tuple.name)
+
+        // Handle duplicates
+        if fileManager.fileExists(atPath: newPath) && newPath != filePath {
+            newPath = findAvailablePath(newPath)
+            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+            printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
+        }
+
+        // Rename file
+        try fileManager.moveItem(atPath: filePath, toPath: newPath)
+
+        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+        printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateString)")
     }
     catch {
         print("realdate: \(filename): \(error.localizedDescription)")
@@ -242,6 +253,7 @@ struct RealDate: ParsableCommand {
     var path: String
     
     mutating func run() throws {
+        // If custom date format is set, force-override both existing date-formatters with this format
         if let format = self.format {
             DateFormatter.yyyyMMddFormatters.forEach { formatter in
                 formatter.dateFormat = format
