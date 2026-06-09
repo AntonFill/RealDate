@@ -15,10 +15,11 @@ struct DateFilenameTuple {
 
 extension DateFormatter {
     
-    static var yyyymmdd: DateFormatter {
+    static var yyyyMMdd: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy.MM.dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
         return formatter
     }
     
@@ -26,7 +27,20 @@ extension DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy.MM.dd.HH.mm"
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
         return formatter
+    }
+    
+    static var mediumDateShortTime: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.timeZone = TimeZone.current
+        return formatter
+    }
+    
+    static var yyyyMMddFormatters: [DateFormatter] {
+        [.yyyyMMdd_HHmm, yyyyMMdd]
     }
     
     func date(fromFilename filename: String) -> Date? {
@@ -46,11 +60,7 @@ func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
 }
 
 func parseDateFromFilename(_ filename: String) -> DateFilenameTuple? {
-    let formatters = [
-        DateFormatter.yyyyMMdd_HHmm,
-        DateFormatter.yyyymmdd
-    ]
-    for formatter in formatters {
+    for formatter in DateFormatter.yyyyMMddFormatters {
         guard let date = formatter.date(fromFilename: filename) else {
             continue // next formatter.
         }
@@ -97,23 +107,26 @@ func findAvailablePath(_ filePath: String) -> String {
     }
 }
 
-func processFile(_ filePath: String) -> Bool {
+func processFile(_ filePath: String, verbose: Bool = false) {
     let fileManager = FileManager.default
     var isDir: ObjCBool = false
 
     guard fileManager.fileExists(atPath: filePath, isDirectory: &isDir) else {
-        return false
+        printIf(verbose, "realdate: \(filePath): No such file or directory")
+        return
     }
 
     // Skip directories
     if isDir.boolValue {
-        return false
+        printIf(verbose, "realdate: \(filePath): Expecting file, but is a directory. skipping")
+        return
     }
 
     let filename = URL(fileURLWithPath: filePath).lastPathComponent
 
     guard let tuple = parseDateFromFilename(filename) else {
-        return false
+        printIf(verbose, "realdate: \(filename): No date prefix found, skipping")
+        return
     }
 
     let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
@@ -122,6 +135,8 @@ func processFile(_ filePath: String) -> Bool {
     // Handle duplicates
     if fileManager.fileExists(atPath: newPath) && newPath != filePath {
         newPath = findAvailablePath(newPath)
+        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+        printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
     }
 
     do {
@@ -135,17 +150,19 @@ func processFile(_ filePath: String) -> Bool {
         ]
         try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
 
-        print("✓ \(filename) → \(URL(fileURLWithPath: newPath).lastPathComponent)")
-        return true
+        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+        let dateFormatter = DateFormatter.mediumDateShortTime
+        printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateFormatter.string(from: tuple.date))")
     }
     catch {
-        print("✗ \(filename): \(error.localizedDescription)")
-        return false
+        print("realdate: \(filename): \(error.localizedDescription)")
     }
 }
 
-func processDirectory(_ dirPath: String, recursive: Bool) {
+func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false) {
     let fileManager = FileManager.default
+
+    printIf(verbose, "realdate: Processing directory: \(dirPath)")
 
     do {
         let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
@@ -160,61 +177,62 @@ func processDirectory(_ dirPath: String, recursive: Bool) {
 
             if isDir.boolValue {
                 if recursive {
-                    processDirectory(fullPath, recursive: true)
+                    processDirectory(fullPath, recursive: true, verbose: verbose)
+                } else {
+                    printIf(verbose, "realdate: \(item): Skipping subdirectory (use -r for recursive)")
                 }
             } else {
-                _ = processFile(fullPath)
+                processFile(fullPath, verbose: verbose)
             }
         }
     } catch {
-        print("Error reading directory: \(error.localizedDescription)")
+        print("realdate: \(dirPath): \(error.localizedDescription)")
     }
 }
 
 @main
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
-    static let abstract = "Sucht nach dem vorangehenden Datum im Dateinamen, entfernt diesen aus dem Dateinamen und weist ihn als created- & modified-Datum dieser Datei zu."
+    static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
     static let version = "0.1.0"
-    
+
     static let configuration = CommandConfiguration(
         commandName: Self.appname,
         abstract: Self.abstract,
         version: Self.version
     )
-    
-    @Option(name: .shortAndLong, help: "Das Datumsformat (z.B. YYYY-MM-DD).")
-    var format: String = "YYYY.MM.DD"
-    
-    @Flag(name: .shortAndLong, help: "Suche rekursiv in Unterordnern.")
+
+    @Option(name: .shortAndLong, help: "Date custom format (e.g. dd-MM-yyyy).")
+    var format: String? = nil
+
+    @Flag(name: .shortAndLong, help: "Search recursively in subdirectories.")
     var recursive = false
-    
-    @Flag(name: .shortAndLong, help: "Zeige detaillierte Informationen an.")
+
+    @Flag(name: .shortAndLong, help: "Show detailed information.")
     var verbose = false
-    
-    @Argument(help: "Der Pfad zur Datei(en) oder zum Verzeichnis.")
+
+    @Argument(help: "Path to file(s) or directory.")
     var path: String
     
     mutating func run() throws {
+        if let format = self.format {
+            DateFormatter.yyyyMMddFormatters.forEach { formatter in
+                formatter.dateFormat = format
+            }
+        }
+        
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
 
         guard fileManager.fileExists(atPath: self.path, isDirectory: &isDir) else {
-            print("\(self.path) not found. Stop here!")
+            print("realdate: \(self.path): No such file or directory")
             return
         }
 
         if isDir.boolValue {
-            processDirectory(self.path, recursive: recursive)
+            processDirectory(self.path, recursive: recursive, verbose: verbose)
         } else {
-            _ = processFile(self.path)
+            processFile(self.path, verbose: verbose)
         }
-        
-//        guard let date = formatter.date(from: dateString) else {
-//            printIf(self.verbose, "\(filename) \thas no prefix date, will be ignored.")
-//            exit(0)
-//        }
-//        
-//        printIf(self.verbose, "\(filename) \tfound date: \(date)")
     }
 }

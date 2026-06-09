@@ -8,38 +8,64 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 
 ## Features
 
-- **Extract dates** from filename prefix (`YYYY.MM.DD` format)
-- **Parse optional time** (`HH-mm` format for emails, etc.)
+- **Extract dates** from filename prefix (flexible format: `YYYY.MM.DD`, `YYYY-MM-DD`, `YYYY_MM_DD`)
+- **Parse optional time** (format: `YYYY.MM.DD.HH.mm` for emails, etc.)
 - **Set macOS timestamps** (both creation and modification dates)
 - **Clean filenames** by removing the date prefix
+- **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
 - **Recursive processing** with `-r` flag
+- **Verbose mode** with `-v` flag for detailed output
 - **Skip files** without leading dates (safe to run on mixed directories)
-- **Default time handling** (10:00 if no time specified)
 
 ## Usage
 
 ```bash
 # Process single file
 ./realdate "2026.06.07 MyDocument.pdf"
-# Result: MyDocument.pdf with timestamps set to 2026-06-07 10:00
 
-# Process all PDFs in current directory
-./realdate *.pdf
+# Process directory
+./realdate ~/Documents
 
-# Process all files recursively
-./realdate -r .
+# Process recursively
+./realdate -r ~/Paperless
 
-# Glob patterns work too
-./realdate -r ~/Paperless/**/*.pdf
+# Verbose output
+./realdate -v -r .
+
+# Show help
+./realdate --help
 ```
 
 ## Filename Format
 
-- **Standard:** `2026.06.07 MyDocument.pdf` → `MyDocument.pdf`
-- **With time:** `2026.02.12 16-30 Email.eml` → `16-30 Email.eml`
+### Supported Date Formats
+- **Dots:** `2026.06.07 MyDocument.pdf` → `MyDocument.pdf`
+- **Dashes:** `2026-06-07 MyDocument.pdf` → `MyDocument.pdf`
+- **Underscores:** `2026_06_08 MyDocument.pdf` → `MyDocument.pdf`
+
+### With Time
+- **Time format:** `2026.06.07.14.30 Email.eml` → `Email.eml` (time: 14:30)
+- Time is optional; if missing, defaults to 00:00
+
+### Edge Cases
 - **Multiple spaces:** `2026.06.07 My Important Doc.pdf` → `My Important Doc.pdf`
-- **No date:** `MyDocument.pdf` → skipped silently
-- **Trailing dates:** `2026.06.07 Document 2025.05.10.pdf` → `Document 2025.05.10.pdf` (first date only)
+- **No date:** `MyDocument.pdf` → skipped silently (or with message in verbose mode)
+- **Trailing dates:** `2026.06.07 Document 2025.05.10.pdf` → `Document 2025.05.10.pdf` (only first date processed)
+- **Duplicates:** Automatic counter added (`Document.txt`, `Document 2.txt`, etc.)
+
+## Options
+
+```
+OPTIONS:
+  -f, --format <format>   Das Datumsformat (z.B. YYYY-MM-DD). (default: YYYY.MM.DD)
+  -r, --recursive         Suche rekursiv in Unterordnern.
+  -v, --verbose           Zeige detaillierte Informationen an.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+ARGUMENTS:
+  <path>                  Der Pfad zur Datei(en) oder zum Verzeichnis.
+```
 
 ## Building
 
@@ -61,15 +87,15 @@ swift test
 - **Email Archives**: Extract emails with timestamps intact
 - **Bulk Organization**: Rename and timestamp entire directories recursively
 
-## macOS API
+## Implementation Details
 
-Uses standard Foundation APIs:
-- `FileManager` for file operations
-- `DateComponents` and `Calendar` for date parsing
-- File attributes for timestamp manipulation
+- **Date parsing:** Two-pass approach with `DateFormatter` (tries time format first, then date-only)
+- **Flexible separators:** Normalizes `-`, `_`, `:`, and spaces to `.` for parsing
+- **Duplicate handling:** Incremental counter like macOS Finder
+- **Verbose mode:** Shows skipped files, ignored files, duplicate handling, and timestamp details
 
 ## Compatibility
 
-- macOS only (uses macOS-specific timestamp APIs)
+- macOS 10.15+ (uses macOS-specific timestamp APIs)
 - Swift 6.0+
 - Requires file system write permissions

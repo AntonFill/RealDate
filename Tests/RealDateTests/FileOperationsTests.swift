@@ -25,8 +25,7 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("TestDocument.txt").path)
         }
 
-        let result = processFile(testPath)
-        #expect(result == true)
+        processFile(testPath)
 
         let newPath = tempDir.appendingPathComponent("TestDocument.txt").path
         #expect(FileManager.default.fileExists(atPath: newPath))
@@ -42,8 +41,10 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(atPath: testPath)
         }
 
-        let result = processFile(testPath)
-        #expect(result == false)
+        processFile(testPath)
+
+        // File should still exist with original name (not renamed)
+        #expect(FileManager.default.fileExists(atPath: testPath))
     }
 
     @Test("Skip directories")
@@ -56,8 +57,10 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(atPath: testDir.path)
         }
 
-        let result = processFile(testDir.path)
-        #expect(result == false)
+        processFile(testDir.path)
+
+        // Directory should still exist with original name
+        #expect(FileManager.default.fileExists(atPath: testDir.path))
     }
 
     @Test("Handle duplicate filenames")
@@ -77,14 +80,9 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("Document 3.txt").path)
         }
 
-        let result1 = processFile(testPath1)
-        #expect(result1 == true)
-
-        let result2 = processFile(testPath2)
-        #expect(result2 == true)
-        
-        let result3 = processFile(testPath3)
-        #expect(result3 == true)
+        processFile(testPath1)
+        processFile(testPath2)
+        processFile(testPath3)
 
         let newPath1 = tempDir.appendingPathComponent("Document.txt").path
         let newPath2 = tempDir.appendingPathComponent("Document 2.txt").path
@@ -106,8 +104,7 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(atPath: tempDir.appendingPathComponent("Email.eml").path)
         }
 
-        let result = processFile(testPath)
-        #expect(result == true)
+        processFile(testPath)
 
         let newPath = tempDir.appendingPathComponent("Email.eml").path
         #expect(FileManager.default.fileExists(atPath: newPath))
