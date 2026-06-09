@@ -107,7 +107,7 @@ func findAvailablePath(_ filePath: String) -> String {
     }
 }
 
-func processFile(_ filePath: String, verbose: Bool = false) {
+func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = false) {
     let fileManager = FileManager.default
     var isDir: ObjCBool = false
 
@@ -129,37 +129,50 @@ func processFile(_ filePath: String, verbose: Bool = false) {
         return
     }
 
-    let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
-    var newPath = (directory as NSString).appendingPathComponent(tuple.name)
-
-    // Handle duplicates
-    if fileManager.fileExists(atPath: newPath) && newPath != filePath {
-        newPath = findAvailablePath(newPath)
-        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-        printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
-    }
-
     do {
-        // Rename file
-        try fileManager.moveItem(atPath: filePath, toPath: newPath)
+        if noRename {
+            // Only set timestamps, keep filename as-is
+            let attributes: [FileAttributeKey: Any] = [
+                .creationDate: tuple.date,
+                .modificationDate: tuple.date
+            ]
+            try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
 
-        // Set timestamps
-        let attributes: [FileAttributeKey: Any] = [
-            .creationDate: tuple.date,
-            .modificationDate: tuple.date
-        ]
-        try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
+            let dateFormatter = DateFormatter.mediumDateShortTime
+            printIf(verbose, "realdate: \(filename): Date set to \(dateFormatter.string(from: tuple.date)) (filename unchanged)")
+        } else {
+            // Rename file and set timestamps
+            let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
+            var newPath = (directory as NSString).appendingPathComponent(tuple.name)
 
-        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-        let dateFormatter = DateFormatter.mediumDateShortTime
-        printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateFormatter.string(from: tuple.date))")
+            // Handle duplicates
+            if fileManager.fileExists(atPath: newPath) && newPath != filePath {
+                newPath = findAvailablePath(newPath)
+                let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+                printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
+            }
+
+            // Rename file
+            try fileManager.moveItem(atPath: filePath, toPath: newPath)
+
+            // Set timestamps
+            let attributes: [FileAttributeKey: Any] = [
+                .creationDate: tuple.date,
+                .modificationDate: tuple.date
+            ]
+            try fileManager.setAttributes(attributes, ofItemAtPath: newPath)
+
+            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+            let dateFormatter = DateFormatter.mediumDateShortTime
+            printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateFormatter.string(from: tuple.date))")
+        }
     }
     catch {
         print("realdate: \(filename): \(error.localizedDescription)")
     }
 }
 
-func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false) {
+func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false, noRename: Bool = false, includeHidden: Bool = false) {
     let fileManager = FileManager.default
 
     printIf(verbose, "realdate: Processing directory: \(dirPath)")
@@ -168,6 +181,12 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false)
         let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
 
         for item in contents {
+            // Skip hidden files/directories unless includeHidden is true
+            if !includeHidden && item.hasPrefix(".") {
+                printIf(verbose, "realdate: \(item): Skipping hidden item")
+                continue
+            }
+
             let fullPath = (dirPath as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
 
@@ -177,12 +196,12 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false)
 
             if isDir.boolValue {
                 if recursive {
-                    processDirectory(fullPath, recursive: true, verbose: verbose)
+                    processDirectory(fullPath, recursive: true, verbose: verbose, noRename: noRename, includeHidden: includeHidden)
                 } else {
                     printIf(verbose, "realdate: \(item): Skipping subdirectory (use -r for recursive)")
                 }
             } else {
-                processFile(fullPath, verbose: verbose)
+                processFile(fullPath, verbose: verbose, noRename: noRename)
             }
         }
     } catch {
@@ -194,7 +213,7 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false)
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
     static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
-    static let version = "0.1.0"
+    static let version = "1.0.0"
 
     static let configuration = CommandConfiguration(
         commandName: Self.appname,
@@ -210,6 +229,12 @@ struct RealDate: ParsableCommand {
 
     @Flag(name: .shortAndLong, help: "Show detailed information.")
     var verbose = false
+
+    @Flag(name: .long, help: "Set timestamps only, do not rename files.")
+    var noRename = false
+
+    @Flag(name: .long, help: "Include hidden files and directories (starting with .).")
+    var includeHidden = false
 
     @Argument(help: "Path to file(s) or directory.")
     var path: String
@@ -230,9 +255,9 @@ struct RealDate: ParsableCommand {
         }
 
         if isDir.boolValue {
-            processDirectory(self.path, recursive: recursive, verbose: verbose)
+            processDirectory(self.path, recursive: recursive, verbose: verbose, noRename: noRename, includeHidden: includeHidden)
         } else {
-            processFile(self.path, verbose: verbose)
+            processFile(self.path, verbose: verbose, noRename: noRename)
         }
     }
 }

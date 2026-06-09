@@ -60,6 +60,8 @@ OPTIONS:
   -f, --format <format>   Das Datumsformat (z.B. YYYY-MM-DD). (default: YYYY.MM.DD)
   -r, --recursive         Suche rekursiv in Unterordnern.
   -v, --verbose           Zeige detaillierte Informationen an.
+  --no-rename             Setze Zeitstempel, aber ändere Dateinamen nicht.
+  --include-hidden        Versteckte Dateien und Verzeichnisse verarbeiten.
   --version               Show the version.
   -h, --help              Show help information.
 

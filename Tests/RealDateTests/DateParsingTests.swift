@@ -6,8 +6,8 @@
 //
 
 import Testing
-@testable import realdate
 import Foundation
+@testable import realdate
 
 @Suite("Date Parsing")
 struct DateParsingTests {
