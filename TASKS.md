@@ -19,7 +19,7 @@ created: 2026-06-07
 - [ ] **Verzeichnis-Timestamps** — Werden Directory-Attribute (created/modified) angepasst oder nicht?
   - Requirement unklar: nur Dateien oder auch Ordner?
 - [ ] **Timestamp Optimization** — Vermeide redundante Timestamp-Setzungen bei bereits korrekten Werten
-- [ ] **Directory Processing Order** — Verzeichnisse und Dateien alphabetisch sortieren beim Verarbeiten
+- [x] **Directory Processing Order** — Verzeichnisse und Dateien alphabetisch sortieren beim Verarbeiten ✓
 
 ## Notes
 - All tasks related to realdate project

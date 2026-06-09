@@ -178,7 +178,9 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false,
     printIf(verbose, "realdate: Processing directory: \(dirPath)")
 
     do {
+        // Get directory contents and sort them alphabetically
         let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
         for item in contents {
             // Skip hidden files/directories unless includeHidden is true
