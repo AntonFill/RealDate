@@ -14,11 +14,14 @@ created: 2026-06-07
 - [x] **Default Path Handling** — Wenn kein Path angegeben: aktuelles Verzeichnis verarbeiten ✓
 - [x] **No-Rename Mode (--no-rename)** — Timestamps setzen ohne Dateinamen zu ändern ✓
 - [x] **Hidden Files Handling (--include-hidden)** — Versteckte Dateien per default ignorieren ✓
+- [ ] **custom format (--format)** - User vergibt sein eigenes Date-Format z.B. weil die Fotos folgend ausschauen "14.05.2026 DSC134.jpg"
+  - [ ] Unittests fehlen
 
 ## Edge Cases & Clarifications
 - [ ] **Verzeichnis-Timestamps** — Werden Directory-Attribute (created/modified) angepasst oder nicht?
   - Requirement unklar: nur Dateien oder auch Ordner?
-- [ ] **Timestamp Optimization** — Vermeide redundante Timestamp-Setzungen bei bereits korrekten Werten
+- [x] **Timestamp Optimization** — Vermeide redundante Timestamp-Setzungen bei bereits korrekten Werten
+  - [ ] Unittests fehlen
 - [x] **Directory Processing Order** — Verzeichnisse und Dateien alphabetisch sortieren beim Verarbeiten ✓
 
 ## Notes

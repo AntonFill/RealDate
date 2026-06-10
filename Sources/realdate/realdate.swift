@@ -146,18 +146,24 @@ func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = fal
         
         // Compare the creation-date with date from filename.
         //   Are the dates (w/o times) equal, no need to reset the date to the same value.
-        if tuple.date.isSameDay(as: creationDate) == false {
+        var dateString: String
+        if tuple.date.isSameDay(as: creationDate) {
+            dateString = DateFormatter.mediumDateShortTime.string(from: creationDate)
+            dateString = "Date unchanged at \(creationDate)"
+        }
+        else {
             let attributes: [FileAttributeKey: Any] = [
                 .creationDate: tuple.date,
                 .modificationDate: tuple.date
             ]
             try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
+            
+            dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
+            dateString = "Date set to \(dateString)"
         }
-        
-        let dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
-        
+                
         if noRename {
-            printIf(verbose, "realdate: \(filename): Date set to \(dateString) (filename unchanged)")
+            printIf(verbose, "realdate: \(filename): \(dateString) (filename unchanged)")
             return
         }
         
@@ -176,7 +182,7 @@ func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = fal
         try fileManager.moveItem(atPath: filePath, toPath: newPath)
 
         let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-        printIf(verbose, "realdate: \(filename): now \(newFilename): Date set to \(dateString)")
+        printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): \(dateString)")
     }
     catch {
         print("realdate: \(filename): \(error.localizedDescription)")
