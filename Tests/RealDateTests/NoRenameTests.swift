@@ -11,27 +11,24 @@ import Foundation
 
 @Suite("No-Rename Tests")
 struct NoRenameTests {
-    let tempDir = FileManager.default.temporaryDirectory
 
     @Test("Process file with no-rename flag and check attributes are set")
     func processFileWithNoRename() throws {
-        let oldTestPath = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt").path
-        let newTestPath = tempDir.appendingPathComponent("TestDocument.txt").path
-
-        try "Test content".write(toFile: oldTestPath, atomically: true, encoding: .utf8)
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: oldTestPath)
-            try? FileManager.default.removeItem(atPath: newTestPath)
+            try? FileManager.default.removeItem(at: tempDir)
         }
+        
+        let oldTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
+        let newTestURL = tempDir.appendingPathComponent("TestDocument.txt")
+        try "Test content".write(to: oldTestURL, atomically: true, encoding: .utf8)
 
-        processFile(oldTestPath, noRename: true)
+        processFile(oldTestURL.path(percentEncoded: false), noRename: true)
+        #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: newTestURL.path(percentEncoded: false)) == false)
 
-        #expect(FileManager.default.fileExists(atPath: oldTestPath))
-        #expect(FileManager.default.fileExists(atPath: newTestPath) == false)
-
-        let date = try #require( parseDateFromFilename(oldTestPath)?.date )
-        let attributes = try FileManager.default.attributesOfItem(atPath: oldTestPath) // oldTestPath! There is no new-one.
+        let date = try #require( parseDateFromFilename(oldTestURL.lastPathComponent)?.date )
+        let attributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false)) // There is no newTestURL
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)
     }

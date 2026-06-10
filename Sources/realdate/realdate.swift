@@ -189,7 +189,7 @@ func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = fal
     }
 }
 
-func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false, noRename: Bool = false, includeHidden: Bool = false) {
+func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false, noRename: Bool = false) {
     let fileManager = FileManager.default
 
     printIf(verbose, "realdate: Processing directory: \(dirPath)")
@@ -200,8 +200,8 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false,
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
         for item in contents {
-            // Skip hidden files/directories unless includeHidden is true
-            if !includeHidden && item.hasPrefix(".") {
+            // Skip hidden files/directories
+            if item.hasPrefix(".") {
                 printIf(verbose, "realdate: \(item): Skipping hidden item")
                 continue
             }
@@ -215,15 +215,18 @@ func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false,
 
             if isDir.boolValue {
                 if recursive {
-                    processDirectory(fullPath, recursive: true, verbose: verbose, noRename: noRename, includeHidden: includeHidden)
-                } else {
+                    processDirectory(fullPath, recursive: true, verbose: verbose, noRename: noRename)
+                }
+                else {
                     printIf(verbose, "realdate: \(item): Skipping subdirectory (use -r for recursive)")
                 }
-            } else {
+            }
+            else {
                 processFile(fullPath, verbose: verbose, noRename: noRename)
             }
         }
-    } catch {
+    }
+    catch {
         print("realdate: \(dirPath): \(error.localizedDescription)")
     }
 }
@@ -252,9 +255,6 @@ struct RealDate: ParsableCommand {
     @Flag(name: .long, help: "Set timestamps only, do not rename files.")
     var noRename = false
 
-    @Flag(name: .long, help: "Include hidden files and directories (starting with .).")
-    var includeHidden = false
-
     @Argument(help: "Path to file(s) or directory.")
     var path: String
     
@@ -275,7 +275,7 @@ struct RealDate: ParsableCommand {
         }
 
         if isDir.boolValue {
-            processDirectory(self.path, recursive: recursive, verbose: verbose, noRename: noRename, includeHidden: includeHidden)
+            processDirectory(self.path, recursive: recursive, verbose: verbose, noRename: noRename)
         } else {
             processFile(self.path, verbose: verbose, noRename: noRename)
         }

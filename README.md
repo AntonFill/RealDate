@@ -15,7 +15,7 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 - **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
 - **Recursive processing** with `-r` flag
 - **Verbose mode** with `-v` flag for detailed output
-- **Skip files** without leading dates (safe to run on mixed directories)
+- **Skip files** without leading dates; hidden files and folders (safe to run on mixed directories)
 
 ## Usage
 
@@ -61,7 +61,6 @@ OPTIONS:
   -r, --recursive         Suche rekursiv in Unterordnern.
   -v, --verbose           Zeige detaillierte Informationen an.
   --no-rename             Setze Zeitstempel, aber ändere Dateinamen nicht.
-  --include-hidden        Versteckte Dateien und Verzeichnisse verarbeiten.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -98,6 +97,6 @@ swift test
 
 ## Compatibility
 
-- macOS 10.15+ (uses macOS-specific timestamp APIs)
+- macOS 13+
 - Swift 6.0+
 - Requires file system write permissions

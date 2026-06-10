@@ -11,123 +11,114 @@ import Foundation
 
 @Suite("File Operations")
 struct FileOperationsTests {
-    let tempDir = FileManager.default.temporaryDirectory
     
     @Test("Process single file")
     func processSingleFile() throws {
-        let oldTestPath = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt").path
-        let newTestPath = tempDir.appendingPathComponent("TestDocument.txt").path
-
-        try "Test content".write(toFile: oldTestPath, atomically: true, encoding: .utf8)
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: oldTestPath)
-            try? FileManager.default.removeItem(atPath: newTestPath)
+            try? FileManager.default.removeItem(at: tempDir)
         }
-
-        processFile(oldTestPath)
-
-        #expect(FileManager.default.fileExists(atPath: oldTestPath) == false)
-        #expect(FileManager.default.fileExists(atPath: newTestPath))
         
-        let date = try #require( parseDateFromFilename(oldTestPath)?.date )
-        let attributes = try FileManager.default.attributesOfItem(atPath: newTestPath)
+        let oldTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
+        let newTestURL = tempDir.appendingPathComponent("TestDocument.txt")
+        try "Test content".write(to: oldTestURL, atomically: true, encoding: .utf8)
+
+        processFile(oldTestURL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTestURL.path(percentEncoded: false)))
+        
+        let date = try #require( parseDateFromFilename(oldTestURL.lastPathComponent)?.date )
+        let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)
     }
 
     @Test("Skip file with no date")
     func skipFileWithNoDate() throws {
-        let oldTestPath = tempDir.appendingPathComponent("NoDatFile.txt").path
-
-        try "Content".write(toFile: oldTestPath, atomically: true, encoding: .utf8)
-        let oldAttributes = try FileManager.default.attributesOfItem(atPath: oldTestPath)
-        let createdDate = try #require( oldAttributes[.creationDate] as? Date )
-        let modifiedDate = try #require( oldAttributes[.modificationDate] as? Date )
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: oldTestPath)
+            try? FileManager.default.removeItem(at: tempDir)
         }
+        
+        let oldTestURL = tempDir.appendingPathComponent("NoDatFile.txt")
+        try "Content".write(to: oldTestURL, atomically: true, encoding: .utf8)
+        
+        let oldAttributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))
+        let oldCreatedDate = try #require( oldAttributes[.creationDate] as? Date )
+        let oldModifiedDate = try #require( oldAttributes[.modificationDate] as? Date )
 
-        processFile(oldTestPath)
-
-        #expect(FileManager.default.fileExists(atPath: oldTestPath))
-        let date = try #require( parseDateFromFilename(oldTestPath)?.date )
-        let attributes = try FileManager.default.attributesOfItem(atPath: oldTestPath)
-        #expect(attributes[.creationDate] as? Date == createdDate)
-        #expect(attributes[.modificationDate] as? Date == modifiedDate)
+        processFile(oldTestURL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)))
+        
+        let newAttributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))
+        #expect(newAttributes[.creationDate] as? Date == oldCreatedDate)
+        #expect(newAttributes[.modificationDate] as? Date == oldModifiedDate)
     }
 
     @Test("Skip directories")
     func skipDirectories() throws {
-        let testDir = tempDir.appendingPathComponent("2026.06.07 TestDir")
-
-        try FileManager.default.createDirectory(atPath: testDir.path, withIntermediateDirectories: true, attributes: nil)
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: testDir.path)
+            try? FileManager.default.removeItem(at: tempDir)
         }
+        
+        let testDir = tempDir.appendingPathComponent("2026.06.07 TestDir")
+        try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: true)
 
-        processFile(testDir.path)
-
-        #expect(FileManager.default.fileExists(atPath: testDir.path))
+        processFile(testDir.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)))
     }
 
     @Test("Handle duplicate filenames")
     func handleDuplicateFilenames() throws {
-        // Create two files with different dates but same target name
-        let oldTestPath1 = tempDir.appendingPathComponent("2026.06.06 Document.txt").path
-        let newTestPath1 = tempDir.appendingPathComponent("Document.txt").path
-        let oldTestPath2 = tempDir.appendingPathComponent("2026.06.07 Document.txt").path
-        let newTestPath2 = tempDir.appendingPathComponent("Document 2.txt").path
-        let oldTestPath3 = tempDir.appendingPathComponent("2026.06.08 Document.txt").path
-        let newTestPath3 = tempDir.appendingPathComponent("Document 3.txt").path
-
-        try "Content 1".write(toFile: oldTestPath1, atomically: true, encoding: .utf8)
-        try "Content 2".write(toFile: oldTestPath2, atomically: true, encoding: .utf8)
-        try "Content 3".write(toFile: oldTestPath3, atomically: true, encoding: .utf8)
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: oldTestPath1)
-            try? FileManager.default.removeItem(atPath: oldTestPath2)
-            try? FileManager.default.removeItem(atPath: oldTestPath3)
-            
-            try? FileManager.default.removeItem(atPath: newTestPath1)
-            try? FileManager.default.removeItem(atPath: newTestPath2)
-            try? FileManager.default.removeItem(atPath: newTestPath3)
+            try? FileManager.default.removeItem(at: tempDir)
         }
+        
+        // Create two files with different dates but same target name
+        let oldTest1URL = tempDir.appendingPathComponent("2026.06.06 Document.txt")
+        let newTest1URL = tempDir.appendingPathComponent("Document.txt")
+        try "Content 1".write(to: oldTest1URL, atomically: true, encoding: .utf8)
+        
+        let oldTest2URL = tempDir.appendingPathComponent("2026.06.07 Document.txt")
+        let newTest2URL = tempDir.appendingPathComponent("Document 2.txt")
+        try "Content 2".write(to: oldTest2URL, atomically: true, encoding: .utf8)
+        
+        let oldTest3URL = tempDir.appendingPathComponent("2026.06.08 Document.txt")
+        let newTest3URL = tempDir.appendingPathComponent("Document 3.txt")
+        try "Content 3".write(to: oldTest3URL, atomically: true, encoding: .utf8)
 
-        processFile(oldTestPath1)
-        processFile(oldTestPath2)
-        processFile(oldTestPath3)
-
-        #expect(FileManager.default.fileExists(atPath: oldTestPath1) == false)
-        #expect(FileManager.default.fileExists(atPath: oldTestPath2) == false)
-        #expect(FileManager.default.fileExists(atPath: oldTestPath3) == false)
-        #expect(FileManager.default.fileExists(atPath: newTestPath1))
-        #expect(FileManager.default.fileExists(atPath: newTestPath2))
-        #expect(FileManager.default.fileExists(atPath: newTestPath3))
+        processFile(oldTest1URL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTest1URL.path(percentEncoded: false)))
+        
+        processFile(oldTest2URL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTest2URL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTest2URL.path(percentEncoded: false)))
+        
+        processFile(oldTest3URL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTest3URL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTest3URL.path(percentEncoded: false)))
     }
 
     @Test("Time removed from filename")
     func timeRemovedFromFilename() throws {
-        let oldTestPath = tempDir.appendingPathComponent("2026.06.07 14-30 Email.eml").path
-        let newTestPath = tempDir.appendingPathComponent("Email.eml").path
-
-        try "Email content".write(toFile: oldTestPath, atomically: true, encoding: .utf8)
-
+        let tempDir = try createTestDirectory()
         defer {
-            try? FileManager.default.removeItem(atPath: oldTestPath)
-            try? FileManager.default.removeItem(atPath: newTestPath)
+            try? FileManager.default.removeItem(at: tempDir)
         }
-
-        processFile(oldTestPath)
-
-        #expect(FileManager.default.fileExists(atPath: oldTestPath) == false)
-        #expect(FileManager.default.fileExists(atPath: newTestPath))
         
-        let date = try #require( parseDateFromFilename(oldTestPath)?.date )
-        let attributes = try FileManager.default.attributesOfItem(atPath: newTestPath)
+        let oldTestURL = tempDir.appendingPathComponent("2026.06.07 14-30 Email.eml")
+        let newTestURL = tempDir.appendingPathComponent("Email.eml")
+        try "Email content".write(to: oldTestURL, atomically: true, encoding: .utf8)
+
+        processFile(oldTestURL.path(percentEncoded: false))
+        #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTestURL.path(percentEncoded: false)))
+        
+        let date = try #require( parseDateFromFilename(oldTestURL.lastPathComponent)?.date )
+        let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)
     }
