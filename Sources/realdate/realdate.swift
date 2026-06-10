@@ -141,7 +141,7 @@ extension RealDate {
             var dateString: String
             if tuple.date.isSameDay(as: creationDate) {
                 dateString = DateFormatter.mediumDateShortTime.string(from: creationDate)
-                dateString = "Date unchanged at \(creationDate)"
+                dateString = "Date unchanged at \(dateString)"
             }
             else {
                 let attributes: [FileAttributeKey: Any] = [

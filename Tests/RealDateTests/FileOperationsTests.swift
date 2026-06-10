@@ -40,7 +40,7 @@ struct FileOperationsTests {
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)
     }
-
+    
     @Test("Skip file with no date")
     func skipFileWithNoDate() throws {
         let tempDir = try createTestDirectory()
@@ -68,6 +68,68 @@ struct FileOperationsTests {
         let newAttributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))
         #expect(newAttributes[.creationDate] as? Date == oldCreatedDate)
         #expect(newAttributes[.modificationDate] as? Date == oldModifiedDate)
+    }
+    
+    @Test("Skip file with same date")
+    func skipFileWithSameCreationDate() throws {
+        let tempDir = try createTestDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+                
+        let oldTest1URL = tempDir.appendingPathComponent("2026.05.14 10-10 MyDoc.pdf")
+        let midTest1URL = tempDir.appendingPathComponent("10-10 MyDoc.pdf")
+        let newTest1URL = tempDir.appendingPathComponent("MyDoc.pdf")
+        try "Content".write(to: oldTest1URL, atomically: true, encoding: .utf8)
+        
+        let oldTest1Attributes = try FileManager.default.attributesOfItem(atPath: oldTest1URL.path(percentEncoded: false))
+        let oldTest1CreatedDate = try #require( oldTest1Attributes[.creationDate] as? Date )
+        
+        let oldTest2URL = tempDir.appendingPathComponent("2026.05.15 MyImage.img")
+        let newTest2URL = tempDir.appendingPathComponent("MyImage.img")
+        try "Image".write(to: oldTest2URL, atomically: true, encoding: .utf8)
+        
+        let oldTest2Attributes = try FileManager.default.attributesOfItem(atPath: oldTest2URL.path(percentEncoded: false))
+        let oldTest2CreatedDate = try #require( oldTest2Attributes[.creationDate] as? Date )
+        
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = true // Forcing not-to-rename.
+        realDate.verbose = false
+        realDate.path = tempDir.path(percentEncoded: false)
+        try realDate.run()
+        
+        #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: newTest1URL.path(percentEncoded: false)) == false)
+        
+        let midTest1Attributes = try FileManager.default.attributesOfItem(atPath: oldTest1URL.path(percentEncoded: false))
+        let midTest1CreatedDate = try #require( midTest1Attributes[.creationDate] as? Date )
+        #expect(midTest1CreatedDate != oldTest1CreatedDate)
+        
+        #expect(FileManager.default.fileExists(atPath: oldTest2URL.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: newTest2URL.path(percentEncoded: false)) == false)
+        
+        let midTest2Attributes = try FileManager.default.attributesOfItem(atPath: oldTest2URL.path(percentEncoded: false))
+        let midTest2CreatedDate = try #require( midTest2Attributes[.creationDate] as? Date )
+        #expect(midTest2CreatedDate != oldTest2CreatedDate)
+        
+        realDate.format = ["yyyy.MM.dd"] // Forcing to ignore time.
+        realDate.noRename = false // Forcing to rename, usualy creation-date-time would be set to 00:00.
+        try realDate.run()
+        
+        #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: midTest1URL.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: newTest1URL.path(percentEncoded: false)) == false)
+        
+        let newTest1Attributes = try FileManager.default.attributesOfItem(atPath: midTest1URL.path(percentEncoded: false))
+        #expect(newTest1Attributes[.creationDate] as? Date == midTest1CreatedDate) // Skipping works "2026.05.14 10-10" == "2026.05.14 10-10"
+        
+        #expect(FileManager.default.fileExists(atPath: oldTest2URL.path(percentEncoded: false)) == false)
+        #expect(FileManager.default.fileExists(atPath: newTest2URL.path(percentEncoded: false)))
+        
+        let newTest2Attributes = try FileManager.default.attributesOfItem(atPath: newTest2URL.path(percentEncoded: false))
+        #expect(newTest2Attributes[.creationDate] as? Date == midTest2CreatedDate) // "2026.05.15 00-00" == "2026.05.15 00-00"
     }
 
     @Test("Skip directories")
