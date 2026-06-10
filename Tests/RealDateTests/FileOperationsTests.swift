@@ -19,15 +19,23 @@ struct FileOperationsTests {
             try? FileManager.default.removeItem(at: tempDir)
         }
         
-        let oldTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
+        let curTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
         let newTestURL = tempDir.appendingPathComponent("TestDocument.txt")
-        try "Test content".write(to: oldTestURL, atomically: true, encoding: .utf8)
-
-        processFile(oldTestURL.path(percentEncoded: false))
-        #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)) == false)
+        try "Test content".write(to: curTestURL, atomically: true, encoding: .utf8)
+        
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = curTestURL.path(percentEncoded: false)
+        try realDate.run()
+        
+        #expect(FileManager.default.fileExists(atPath: curTestURL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTestURL.path(percentEncoded: false)))
         
-        let date = try #require( parseDateFromFilename(oldTestURL.lastPathComponent)?.date )
+        let formatters = realDate.format.map { $0.customDateFormatter() }
+        let date = try #require( realDate.parseDateFromFilename(curTestURL.lastPathComponent, dateFormatters: formatters)?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)
@@ -39,7 +47,7 @@ struct FileOperationsTests {
         defer {
             try? FileManager.default.removeItem(at: tempDir)
         }
-        
+                
         let oldTestURL = tempDir.appendingPathComponent("NoDatFile.txt")
         try "Content".write(to: oldTestURL, atomically: true, encoding: .utf8)
         
@@ -47,7 +55,14 @@ struct FileOperationsTests {
         let oldCreatedDate = try #require( oldAttributes[.creationDate] as? Date )
         let oldModifiedDate = try #require( oldAttributes[.modificationDate] as? Date )
 
-        processFile(oldTestURL.path(percentEncoded: false))
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = oldTestURL.path(percentEncoded: false)
+        try realDate.run()
+        
         #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)))
         
         let newAttributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))
@@ -65,7 +80,14 @@ struct FileOperationsTests {
         let testDir = tempDir.appendingPathComponent("2026.06.07 TestDir")
         try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: true)
 
-        processFile(testDir.path(percentEncoded: false))
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = testDir.path(percentEncoded: false)
+        try realDate.run()
+        
         #expect(FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)))
     }
 
@@ -89,15 +111,20 @@ struct FileOperationsTests {
         let newTest3URL = tempDir.appendingPathComponent("Document 3.txt")
         try "Content 3".write(to: oldTest3URL, atomically: true, encoding: .utf8)
 
-        processFile(oldTest1URL.path(percentEncoded: false))
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = tempDir.path(percentEncoded: false)
+        try realDate.run()
+        
         #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTest1URL.path(percentEncoded: false)))
         
-        processFile(oldTest2URL.path(percentEncoded: false))
         #expect(FileManager.default.fileExists(atPath: oldTest2URL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTest2URL.path(percentEncoded: false)))
         
-        processFile(oldTest3URL.path(percentEncoded: false))
         #expect(FileManager.default.fileExists(atPath: oldTest3URL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTest3URL.path(percentEncoded: false)))
     }
@@ -113,11 +140,19 @@ struct FileOperationsTests {
         let newTestURL = tempDir.appendingPathComponent("Email.eml")
         try "Email content".write(to: oldTestURL, atomically: true, encoding: .utf8)
 
-        processFile(oldTestURL.path(percentEncoded: false))
+        var realDate = RealDate()
+        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = tempDir.path(percentEncoded: false)
+        try realDate.run()
+        
         #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTestURL.path(percentEncoded: false)))
         
-        let date = try #require( parseDateFromFilename(oldTestURL.lastPathComponent)?.date )
+        let formatters = realDate.format.map { $0.customDateFormatter() }
+        let date = try #require( realDate.parseDateFromFilename(oldTestURL.lastPathComponent, dateFormatters: formatters)?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)

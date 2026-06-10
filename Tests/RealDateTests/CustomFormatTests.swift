@@ -27,15 +27,23 @@ struct CustomFormatTests {
         let newTest2URL = tempDir.appendingPathComponent("TestImage.txt")
         try "Test image".write(to: oldTest2URL, atomically: true, encoding: .utf8)
 
-        processFile(oldTest1URL.path(percentEncoded: false), noRename: false)
+        var realDate = RealDate()
+        let dateFormat = "dd.MM.yyyy"
+        realDate.format = [dateFormat]
+        realDate.recursive = false
+        realDate.noRename = false
+        realDate.verbose = false
+        realDate.path = tempDir.path(percentEncoded: false)
+        try realDate.run()
+        
         #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)))
         #expect(FileManager.default.fileExists(atPath: newTest1URL.path(percentEncoded: false)) == false)
         
-        processFile(oldTest2URL.path(percentEncoded: false), noRename: false)
         #expect(FileManager.default.fileExists(atPath: oldTest2URL.path(percentEncoded: false)) == false)
         #expect(FileManager.default.fileExists(atPath: newTest2URL.path(percentEncoded: false)))
 
-        let date = try #require( parseDateFromFilename(oldTest2URL.lastPathComponent)?.date )
+        let formatter = dateFormat.customDateFormatter()
+        let date = try #require( realDate.parseDateFromFilename(oldTest2URL.lastPathComponent, dateFormatters: [formatter])?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTest2URL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
         #expect(attributes[.modificationDate] as? Date == date)

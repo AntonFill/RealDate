@@ -8,229 +8,6 @@
 import Foundation
 import ArgumentParser
 
-struct DateFilenameTuple {
-    let date: Date
-    let name: String
-}
-
-extension DateFormatter {
-    
-    static var yyyyMMdd: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy.MM.dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }
-    
-    static var yyyyMMdd_HHmm: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy.MM.dd.HH.mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }
-    
-    static var mediumDateShortTime: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }
-    
-    static var yyyyMMddFormatters: [DateFormatter] {
-        [.yyyyMMdd_HHmm, yyyyMMdd]
-    }
-    
-    func date(fromFilename filename: String) -> Date? {
-        let dateLength = self.dateFormat.count
-        let separators = CharacterSet(charactersIn: "-_: ")
-        let dateString = String(filename.prefix(dateLength))
-            .components(separatedBy: separators)
-            .joined(separator: ".")
-        return self.date(from: dateString)
-    }
-}
-
-extension Date {
-    static let currentCalendar = Calendar.current
-    
-    func isSameDay(as otherDate: Date) -> Bool {
-        Self.currentCalendar.isDate(self, inSameDayAs: otherDate)
-    }
-}
-
-func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
-    if condition {
-        print(message())
-    }
-}
-
-func parseDateFromFilename(_ filename: String) -> DateFilenameTuple? {
-    for formatter in DateFormatter.yyyyMMddFormatters {
-        guard let date = formatter.date(fromFilename: filename) else {
-            continue // next formatter.
-        }
-        let trimmingChars = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-_."))
-        let realFilename = filename
-            .dropFirst(formatter.dateFormat.count) // cut away date string.
-            .drop(while: { char in
-                char.unicodeScalars.allSatisfy { trimmingChars.contains($0) } // trims left all chars from trimmingChars set.
-            })
-        
-        guard realFilename.count > 0 else {
-            return nil // if no name left, to much trimmed away. Cancels for this filename.
-        }
-        
-        return DateFilenameTuple(date: date, name: String(realFilename))
-    }
-    return nil
-}
-
-func findAvailablePath(_ filePath: String) -> String {
-    let fileManager = FileManager.default
-
-    guard fileManager.fileExists(atPath: filePath) else {
-        return filePath
-    }
-
-    let url = URL(fileURLWithPath: filePath)
-    let dirPath = url.deletingLastPathComponent().path
-    let filename = url.lastPathComponent
-    let fileExtension = url.pathExtension
-    let baseName = fileExtension.isEmpty ? filename : String(filename.dropLast(fileExtension.count + 1))
-
-    var counter = 2
-    while true {
-        let newFilename = fileExtension.isEmpty ?
-            "\(baseName) \(counter)" :
-            "\(baseName) \(counter).\(fileExtension)"
-        let newPath = (dirPath as NSString).appendingPathComponent(newFilename)
-
-        if !fileManager.fileExists(atPath: newPath) {
-            return newPath
-        }
-        counter += 1
-    }
-}
-
-func processFile(_ filePath: String, verbose: Bool = false, noRename: Bool = false) {
-    let fileManager = FileManager.default
-    var isDir: ObjCBool = false
-
-    guard fileManager.fileExists(atPath: filePath, isDirectory: &isDir) else {
-        printIf(verbose, "realdate: \(filePath): No such file or directory")
-        return
-    }
-
-    // Skip directories
-    if isDir.boolValue {
-        printIf(verbose, "realdate: \(filePath): Expecting file, but is a directory. skipping")
-        return
-    }
-
-    let filename = URL(fileURLWithPath: filePath).lastPathComponent
-
-    guard let tuple = parseDateFromFilename(filename) else {
-        printIf(verbose, "realdate: \(filename): No date prefix found, skipping")
-        return
-    }
-
-    do {
-        // Read the current creation-date
-        let attributes = try fileManager.attributesOfItem(atPath: filePath)
-        guard let creationDate = attributes[.creationDate] as? Date else {
-            throw Foundation.POSIXError(.ENOATTR)
-        }
-        
-        // Compare the creation-date with date from filename.
-        //   Are the dates (w/o times) equal, no need to reset the date to the same value.
-        var dateString: String
-        if tuple.date.isSameDay(as: creationDate) {
-            dateString = DateFormatter.mediumDateShortTime.string(from: creationDate)
-            dateString = "Date unchanged at \(creationDate)"
-        }
-        else {
-            let attributes: [FileAttributeKey: Any] = [
-                .creationDate: tuple.date,
-                .modificationDate: tuple.date
-            ]
-            try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
-            
-            dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
-            dateString = "Date set to \(dateString)"
-        }
-                
-        if noRename {
-            printIf(verbose, "realdate: \(filename): \(dateString) (filename unchanged)")
-            return
-        }
-        
-        // Rename file and set timestamps
-        let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
-        var newPath = (directory as NSString).appendingPathComponent(tuple.name)
-
-        // Handle duplicates
-        if fileManager.fileExists(atPath: newPath) && newPath != filePath {
-            newPath = findAvailablePath(newPath)
-            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-            printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
-        }
-
-        // Rename file
-        try fileManager.moveItem(atPath: filePath, toPath: newPath)
-
-        let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-        printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): \(dateString)")
-    }
-    catch {
-        print("realdate: \(filename): \(error.localizedDescription)")
-    }
-}
-
-func processDirectory(_ dirPath: String, recursive: Bool, verbose: Bool = false, noRename: Bool = false) {
-    let fileManager = FileManager.default
-
-    printIf(verbose, "realdate: Processing directory: \(dirPath)")
-
-    do {
-        // Get directory contents and sort them alphabetically
-        let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-
-        for item in contents {
-            // Skip hidden files/directories
-            if item.hasPrefix(".") {
-                printIf(verbose, "realdate: \(item): Skipping hidden item")
-                continue
-            }
-
-            let fullPath = (dirPath as NSString).appendingPathComponent(item)
-            var isDir: ObjCBool = false
-
-            guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) else {
-                continue
-            }
-
-            if isDir.boolValue {
-                if recursive {
-                    processDirectory(fullPath, recursive: true, verbose: verbose, noRename: noRename)
-                }
-                else {
-                    printIf(verbose, "realdate: \(item): Skipping subdirectory (use -r for recursive)")
-                }
-            }
-            else {
-                processFile(fullPath, verbose: verbose, noRename: noRename)
-            }
-        }
-    }
-    catch {
-        print("realdate: \(dirPath): \(error.localizedDescription)")
-    }
-}
-
 @main
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
@@ -243,8 +20,8 @@ struct RealDate: ParsableCommand {
         version: Self.version
     )
 
-    @Option(name: .shortAndLong, help: "Date custom format (e.g. dd-MM-yyyy).")
-    var format: String? = nil
+    @Option(name: .long, help: "Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd, yyyy-MM-dd-HH-mm).")
+    var format: [String] = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"] // Valid preset.
 
     @Flag(name: .shortAndLong, help: "Search recursively in subdirectories.")
     var recursive = false
@@ -259,12 +36,7 @@ struct RealDate: ParsableCommand {
     var path: String
     
     mutating func run() throws {
-        // If custom date format is set, force-override both existing date-formatters with this format
-        if let format = self.format {
-            DateFormatter.yyyyMMddFormatters.forEach { formatter in
-                formatter.dateFormat = format
-            }
-        }
+        let dateFormatters = self.format.map { $0.customDateFormatter() }
         
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
@@ -275,9 +47,232 @@ struct RealDate: ParsableCommand {
         }
 
         if isDir.boolValue {
-            processDirectory(self.path, recursive: recursive, verbose: verbose, noRename: noRename)
+            self.processDirectory(self.path, dateFormatters: dateFormatters)
         } else {
-            processFile(self.path, verbose: verbose, noRename: noRename)
+            self.processFile(self.path, dateFormatters: dateFormatters)
         }
+    }
+}
+
+// MARK: -
+extension RealDate {
+        
+    struct DateFilenameTuple {
+        let date: Date
+        let name: String
+    }
+}
+
+extension RealDate {
+    
+    func processDirectory(_ dirPath: String, dateFormatters: [DateFormatter]) {
+        printIf(self.verbose, "realdate: Processing directory: \(dirPath)")
+
+        do {
+            let fileManager = FileManager.default
+            
+            // Get directory contents and sort them alphabetically
+            let contents = try fileManager.contentsOfDirectory(atPath: dirPath)
+                .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+
+            for item in contents {
+                // Skip hidden files/directories
+                if item.hasPrefix(".") {
+                    printIf(self.verbose, "realdate: \(item): Skipping hidden item")
+                    continue
+                }
+
+                let fullPath = (dirPath as NSString).appendingPathComponent(item)
+                var isDir: ObjCBool = false
+
+                guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) else {
+                    continue
+                }
+
+                if isDir.boolValue {
+                    if self.recursive {
+                        self.processDirectory(fullPath, dateFormatters: dateFormatters)
+                    }
+                    else {
+                        printIf(self.verbose, "realdate: \(item): Skipping subdirectory (use -r for recursive)")
+                    }
+                }
+                else {
+                    self.processFile(fullPath, dateFormatters: dateFormatters)
+                }
+            }
+        }
+        catch {
+            print("realdate: \(dirPath): \(error.localizedDescription)")
+        }
+    }
+    
+    func processFile(_ filePath: String, dateFormatters: [DateFormatter]) {
+        let fileManager = FileManager.default
+        var isDir: ObjCBool = false
+
+        guard fileManager.fileExists(atPath: filePath, isDirectory: &isDir) else {
+            printIf(verbose, "realdate: \(filePath): No such file or directory")
+            return
+        }
+
+        // Skip directories
+        if isDir.boolValue {
+            printIf(verbose, "realdate: \(filePath): Expecting file, but is a directory. skipping")
+            return
+        }
+
+        let filename = URL(fileURLWithPath: filePath).lastPathComponent
+
+        guard let tuple = self.parseDateFromFilename(filename, dateFormatters: dateFormatters) else {
+            printIf(verbose, "realdate: \(filename): No date prefix found, skipping")
+            return
+        }
+
+        do {
+            // Read the current creation-date
+            let attributes = try fileManager.attributesOfItem(atPath: filePath)
+            guard let creationDate = attributes[.creationDate] as? Date else {
+                throw Foundation.POSIXError(.ENOATTR)
+            }
+            
+            // Compare the creation-date with date from filename.
+            //   Are the dates (w/o times) equal, no need to reset the date to the same value.
+            var dateString: String
+            if tuple.date.isSameDay(as: creationDate) {
+                dateString = DateFormatter.mediumDateShortTime.string(from: creationDate)
+                dateString = "Date unchanged at \(creationDate)"
+            }
+            else {
+                let attributes: [FileAttributeKey: Any] = [
+                    .creationDate: tuple.date,
+                    .modificationDate: tuple.date
+                ]
+                try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
+                
+                dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
+                dateString = "Date set to \(dateString)"
+            }
+                    
+            if self.noRename {
+                printIf(verbose, "realdate: \(filename): \(dateString) (filename unchanged)")
+                return
+            }
+            
+            // Rename file and set timestamps
+            let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
+            var newPath = (directory as NSString).appendingPathComponent(tuple.name)
+
+            // Handle duplicates
+            if fileManager.fileExists(atPath: newPath) && newPath != filePath {
+                newPath = self.findAvailablePath(newPath)
+                let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+                printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
+            }
+
+            // Rename file
+            try fileManager.moveItem(atPath: filePath, toPath: newPath)
+
+            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
+            printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): \(dateString)")
+        }
+        catch {
+            print("realdate: \(filename): \(error.localizedDescription)")
+        }
+    }
+    
+    func parseDateFromFilename(_ filename: String, dateFormatters: [DateFormatter]) -> DateFilenameTuple? {
+        for formatter in dateFormatters {
+            guard let date = formatter.date(fromFilename: filename) else {
+                continue // next formatter.
+            }
+            let trimmingChars = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-_."))
+            let realFilename = filename
+                .dropFirst(formatter.dateFormat.count) // cut away date string.
+                .drop(while: { char in
+                    char.unicodeScalars.allSatisfy { trimmingChars.contains($0) } // trims left all chars from trimmingChars set.
+                })
+            
+            guard realFilename.count > 0 else {
+                return nil // if no name left, to much trimmed away. Cancels for this filename.
+            }
+            
+            return DateFilenameTuple(date: date, name: String(realFilename))
+        }
+        return nil
+    }
+
+    func findAvailablePath(_ filePath: String) -> String {
+        let fileManager = FileManager.default
+
+        guard fileManager.fileExists(atPath: filePath) else {
+            return filePath
+        }
+
+        let url = URL(fileURLWithPath: filePath)
+        let dirPath = url.deletingLastPathComponent().path
+        let filename = url.lastPathComponent
+        let fileExtension = url.pathExtension
+        let baseName = fileExtension.isEmpty ? filename : String(filename.dropLast(fileExtension.count + 1))
+
+        var counter = 2
+        while true {
+            let newFilename = fileExtension.isEmpty ?
+                "\(baseName) \(counter)" :
+                "\(baseName) \(counter).\(fileExtension)"
+            let newPath = (dirPath as NSString).appendingPathComponent(newFilename)
+
+            if !fileManager.fileExists(atPath: newPath) {
+                return newPath
+            }
+            counter += 1
+        }
+    }
+}
+
+// MARK: - globals
+func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
+    if condition {
+        print(message())
+    }
+}
+
+// MARK: - extensions
+extension DateFormatter {
+    
+    static var mediumDateShortTime: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.timeZone = TimeZone.current
+        return formatter
+    }
+    
+    func date(fromFilename filename: String) -> Date? {
+        let dateLength = self.dateFormat.count
+        let separators = CharacterSet(charactersIn: "-_: ")
+        let dateString = String(filename.prefix(dateLength))
+            .components(separatedBy: separators)
+            .joined(separator: ".")
+        return self.date(from: dateString)
+    }
+}
+
+extension String {
+    
+    func customDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = self
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        return formatter
+    }
+}
+
+extension Date {
+    static let currentCalendar = Calendar.current
+    
+    func isSameDay(as otherDate: Date) -> Bool {
+        Self.currentCalendar.isDate(self, inSameDayAs: otherDate)
     }
 }
