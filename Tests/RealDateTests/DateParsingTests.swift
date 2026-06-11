@@ -16,7 +16,7 @@ struct DateParsingTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = ""
         return realDate

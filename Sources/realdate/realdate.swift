@@ -29,8 +29,8 @@ struct RealDate: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Show detailed information.")
     var verbose = false
 
-    @Flag(name: .long, help: "Set timestamps only, do not rename files.")
-    var noRename = false
+    @Flag(name: .long, help: "Set timestamps, and rename files.")
+    var rename = false
 
     @Argument(help: "Path to file(s) or directory.")
     var path: String
@@ -154,7 +154,7 @@ extension RealDate {
                 dateString = "Date set to \(dateString)"
             }
                     
-            if self.noRename {
+            guard self.rename else {
                 printIf(verbose, "realdate: \(filename): \(dateString) (filename unchanged)")
                 return
             }

@@ -30,7 +30,7 @@ struct HiddenFilesTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()
@@ -60,7 +60,7 @@ struct HiddenFilesTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = true
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()

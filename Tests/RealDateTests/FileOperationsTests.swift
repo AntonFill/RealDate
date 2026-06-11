@@ -26,7 +26,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = curTestURL.path(percentEncoded: false)
         try realDate.run()
@@ -58,7 +58,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = oldTestURL.path(percentEncoded: false)
         try realDate.run()
@@ -95,7 +95,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = true // Forcing not-to-rename.
+        realDate.rename = false // Forcing not-to-rename.
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()
@@ -115,7 +115,7 @@ struct FileOperationsTests {
         #expect(midTest2CreatedDate != oldTest2CreatedDate)
         
         realDate.format = ["yyyy.MM.dd"] // Forcing to ignore time.
-        realDate.noRename = false // Forcing to rename, usualy creation-date-time would be set to 00:00.
+        realDate.rename = true // Forcing to rename, usualy creation-date-time would be set to 00:00.
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)) == false)
@@ -145,7 +145,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = testDir.path(percentEncoded: false)
         try realDate.run()
@@ -176,7 +176,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()
@@ -205,7 +205,7 @@ struct FileOperationsTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()

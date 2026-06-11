@@ -26,7 +26,7 @@ struct NoRenameTests {
         var realDate = RealDate()
         realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
         realDate.recursive = false
-        realDate.noRename = true
+        realDate.rename = false
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()

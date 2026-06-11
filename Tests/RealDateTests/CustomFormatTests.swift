@@ -31,7 +31,7 @@ struct CustomFormatTests {
         let dateFormat = "dd.MM.yyyy"
         realDate.format = [dateFormat]
         realDate.recursive = false
-        realDate.noRename = false
+        realDate.rename = true
         realDate.verbose = false
         realDate.path = tempDir.path(percentEncoded: false)
         try realDate.run()
