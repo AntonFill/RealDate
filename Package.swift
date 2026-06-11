@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "realdate",
+    name: "RealDate",
     platforms: [
         .macOS(.v13)
     ],
