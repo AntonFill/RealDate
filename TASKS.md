@@ -16,7 +16,9 @@ created: 2026-06-07
 - [x] **custom date format (--format)** - Eigenes Date-Format beim Scannen des Dateinamens "14.05.2026 DSC134.jpg" ✓
 - [x] **recursive (-r / --recursive)** - Es werden alle Unterverzeichnisse durch gegangen ✓
 - [ ] **custom new filename format (--new-filename-format)** - Eigenes Date-Format beim Verändern des Dateinames "yyyy.MM.dd"
-  - Wenn die Datei ein anderes oder gar-kein Date-Format im Filenamen hatte, wird eins basierend auf creation-Date links eingefügt. 
+  - Wenn die Datei ein anderes oder gar-kein Date-Format im Filenamen hatte, wird eins basierend auf creation-Date links eingefügt.
+- [ ] **GitHub OpenSource** - Mein Portfolio und Nutzen für die Welt.
+- [ ] **HomeBrew install** - App soll über home brew installierbar sein.
 
 ## Edge Cases & Clarifications
 - [ ] **Verzeichnis-Timestamps** — Werden Directory-Attribute (created/modified) angepasst oder nicht?
