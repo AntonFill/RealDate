@@ -1,6 +1,6 @@
 # realdate
 
-A Swift CLI tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
+A cli tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
 
 ## Problem
 
@@ -80,11 +80,36 @@ swift build -c release
 # Binary: .build/release/realdate
 ```
 
+## Local Development
+```bash
+make build               # Build only
+make install             # Build + install to /usr/local/bin/
+make uninstall           # Remove from /usr/local/bin/
+make clean               # Clean build artifacts
+```
+
 ## Testing
 
 ```bash
 swift test
 ```
+
+## Installation
+
+### Via Homebrew (Recommended)
+```bash
+brew tap AntonFill/tap
+brew install realdate
+```
+
+## Uninstallation
+
+### Via Homebrew (Recommended)
+```bash
+brew uninstall realdate
+brew untap AntonFill/tap
+```
+
 
 ## Use Cases
 - **Paperless Office**: Organize scanned documents by their archive date, not scan date.
