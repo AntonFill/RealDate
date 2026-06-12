@@ -12,7 +12,7 @@ import ArgumentParser
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
     static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
-    static let version = "1.0.0"
+    static let version = "1.1.0"
 
     static let configuration = CommandConfiguration(
         commandName: Self.appname,
