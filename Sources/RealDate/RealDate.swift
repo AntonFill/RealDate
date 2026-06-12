@@ -130,32 +130,15 @@ extension RealDate {
         }
 
         do {
-            // Read the current creation-date
-            let attributes = try fileManager.attributesOfItem(atPath: filePath)
-            guard let creationDate = attributes[.creationDate] as? Date else {
-                throw Foundation.POSIXError(.ENOATTR)
-            }
+            let attributes: [FileAttributeKey: Any] = [
+                .creationDate: tuple.date,
+                .modificationDate: tuple.date
+            ]
+            try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
             
-            // Compare the creation-date with date from filename.
-            //   Are the dates (w/o times) equal, no need to reset the date to the same value.
-            var dateString: String
-            if tuple.date.isSameDay(as: creationDate) {
-                dateString = DateFormatter.mediumDateShortTime.string(from: creationDate)
-                dateString = "Date unchanged at \(dateString)"
-            }
-            else {
-                let attributes: [FileAttributeKey: Any] = [
-                    .creationDate: tuple.date,
-                    .modificationDate: tuple.date
-                ]
-                try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
-                
-                dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
-                dateString = "Date set to \(dateString)"
-            }
-                    
+            let dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
             guard self.rename else {
-                printIf(verbose, "realdate: \(filename): \(dateString) (filename unchanged)")
+                printIf(verbose, "realdate: \(filename): Date set to \(dateString) (filename unchanged)")
                 return
             }
             
@@ -174,7 +157,7 @@ extension RealDate {
             try fileManager.moveItem(atPath: filePath, toPath: newPath)
 
             let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-            printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): \(dateString)")
+            printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): Date set to \(dateString)")
         }
         catch {
             print("realdate: \(filename): \(error.localizedDescription)")
